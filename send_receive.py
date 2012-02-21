@@ -1,5 +1,6 @@
 import sys
 import socket
+import time
 
 def next_packet(processed_file):
     for i in xrange(len(processed_file['data'])):
@@ -45,34 +46,42 @@ def read_packet(files,input_packet):
     else:
         files[input_packet['name']]['data'][input_packet['block']] = input_packet['data']
 
-def construct(input_files,output_filename):
-    for input_file in input_files:
-        if None in input_file['data']:
-                print 'file incomplete'
+def construct(input_files):
+    complete_list = []
+    for name,info in input_files.iteritems():
+        if None in info['data']:
                 return None
         output = ''
-        for fragment in input_file['data']:
+        for fragment in info['data']:
             output+=fragment
-        open(input_file['name'],'wb').write(output)
-        print 'Creating: %s' % (input_file['name'])
+        open(name,'wb').write(output)
+        print 'Creating: %s' % (name)
+        complete_list.append(name)
+    for filename in complete_list:
+        del input_files[filename]
 
 def receive():
     sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     sock.bind(('',44000))
-    try:
-        files = {}
-        while True:
+    files = {}
+    while True:
+        try:
             data = eval(sock.recv(65536))
             read_packet(files,data)            
             construct(files)
-    except:
-        print 'error'
+        except Exception as inst:
+            print inst
+            
 
 def send():
     sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     block_size = 1000
-    input_file = read_file('sample.jpg',block_size)
+    pause_time = 0.02
+    filename = 'Fig126_12000_Inun_west_2000.pdf'
+    input_file = read_file(filename,block_size)
     for packet in next_packet(input_file):
+        print 'Sending block %i of %i' % (packet['block'],packet['total'])
         sock.sendto(repr(packet),('localhost',44000))
+        time.sleep(pause_time)
 
-    
+send()
