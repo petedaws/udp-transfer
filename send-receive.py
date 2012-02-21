@@ -45,18 +45,16 @@ def read_packet(files,input_packet):
     else:
         files[input_packet['name']]['data'][input_packet['block']] = input_packet['data']
 
-def construct(input_list,output_filename):
-    if None in input_list['data']:
-            print 'file incomplete'
-            return None
-    output = ''
-    for fragment in input_list['data']:
-        output+=fragment
-    open(output_filename,'wb').write(output)
-    print 'Creating: %s' % (output_filename)
-
-def check_complete(input_file):
-    
+def construct(input_files,output_filename):
+    for input_file in input_files:
+        if None in input_file['data']:
+                print 'file incomplete'
+                return None
+        output = ''
+        for fragment in input_file['data']:
+            output+=fragment
+        open(input_file['name'],'wb').write(output)
+        print 'Creating: %s' % (input_file['name'])
 
 def receive():
     sock = socket.socet(socket.AF_INET,socket.DGRAM)
@@ -65,9 +63,10 @@ def receive():
         files = {}
         while True:
             data = eval(sock.recv(65536))
-            read_packet(files,data)
-            
-    construct(files['sample.jpg'],'sample_reconstructed.jpg')
+            read_packet(files,data)            
+            construct(files)
+    except:
+        print 'error'
 
 def send():
     sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
