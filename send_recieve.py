@@ -57,7 +57,7 @@ def construct(input_files,output_filename):
         print 'Creating: %s' % (input_file['name'])
 
 def receive():
-    sock = socket.socet(socket.AF_INET,socket.DGRAM)
+    sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     sock.bind(('',44000))
     try:
         files = {}
