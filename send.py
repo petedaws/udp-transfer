@@ -5,7 +5,7 @@ from Tkinter import *
 import tooltip
 
 BLOCKSIZE = 10
-PAUSETIME = 0.5
+PAUSETIME = 0.1
 SQUARESIZE = 10
 
 def next_packet(processed_file):
@@ -24,6 +24,7 @@ def read_file(input_filename,block_size):
     if len(input_file) % block_size != 0:
         block_count += 1
     file_data = [None for x in range(block_count)]
+    send_status = [False for x in range(block_count)]
     for i in xrange(block_count):
         if i*block_size > len(input_file):
             file_data[i] = input_file[i*block_size:]
@@ -34,6 +35,7 @@ def read_file(input_filename,block_size):
                     'block_size':block_size,
                     'total':block_count,
                     'data':file_data,
+                    'send_status':send_status
                     }
     return processed_file
 
@@ -42,7 +44,29 @@ def send(processed_file):
     for packet in next_packet(processed_file):
         print 'Sending block %i of %i' % (packet['block'],packet['total'])
         sock.sendto(repr(packet),('localhost',44000))
+        processed_file['send_status'][packet['block']] = True
         time.sleep(PAUSETIME)
+
+def send_block_range(processed_file,start,end):
+    sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    for i in xrange(start,end):
+        packet = {\
+                'block':i,
+                'total':processed_file['total'],
+                'name':processed_file['name'],
+                'data':processed_file['data'][i],
+                'block_size':processed_file['block_size'],
+                }
+        print 'Sending block %i of %i' % (packet['block'],packet['total'])
+        sock.sendto(repr(packet),('localhost',44000))
+        processed_file['send_status'][i] = True
+        time.sleep(PAUSETIME)
+
+def check_range_sent(processed_file,start,end):
+    for i in xrange(start,end):
+        if not processed_file['send_status'][i]:
+            return False
+    return True
 
 
 class FileSender(Frame):
@@ -51,26 +75,35 @@ class FileSender(Frame):
         self.master.title(".")	  
         self.grid()
         self.processed_file = read_file(filename,BLOCKSIZE)
-        buttons = []
+        self.buttons = []
+        self.handlers = []
         button_count = 0
         for row in xrange(SQUARESIZE):
             for col in xrange(SQUARESIZE):
                 button = Button(self,text='%03d' % (button_count),anchor=W)
                 button.grid(row=row,column=col)
                 tooltip.createToolTip(button, '%d to %d' %(self.get_block_range(button_count)[0],self.get_block_range(button_count)[1]))
-                def handler(event, self=self,blockrange=self.get_block_range(button_count)):
-                        return self.send_blocks(blockrange[0],blockrange[1])
+                def handler(event, self=self,button_number=button_count,blockrange=self.get_block_range(button_count)):
+                        return self.send_blocks(button_number,blockrange[0],blockrange[1])
                 button.bind("<Button-1>", handler)
-                
-                buttons.append(button)
+                self.buttons.append(button)
+                self.handlers.append(handler)
                 button_count+=1
                 if button_count > self.processed_file['total']:
                     break
             if button_count > self.processed_file['total']:
                     break
+        self.send_all()
 
-    def send_blocks(self,start,end):
-        print '%d to %d' % (start,end)
+    def send_all(self):
+        for handler in self.handlers:
+            handler(None)
+
+    def send_blocks(self,button_number,start,end):
+        send_block_range(self.processed_file,start,end)
+        if check_range_sent(self.processed_file,start,end):
+            self.buttons[button_number].configure(bg = "green")
+        
 
     def get_block_range(self,input_value):
         block_count = self.processed_file['total']
