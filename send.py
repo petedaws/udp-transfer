@@ -5,7 +5,7 @@ from Tkinter import *
 import tooltip
 
 BLOCKSIZE = 10
-PAUSETIME = 0.1
+PAUSETIME = 0.2
 SQUARESIZE = 10
 
 def next_packet(processed_file):

@@ -2,7 +2,10 @@ import sys
 import socket
 import time
 from Tkinter import *
-import asyncore
+from threading import Thread
+import tooltip
+
+SQUARESIZE = 10
 
 def read_packet(files,input_packet):
     if input_packet['name'] not in files:
@@ -31,60 +34,69 @@ def construct(input_files):
         complete_list.append(name)
     for filename in complete_list:
         del input_files[filename]
-  
-class DisplayBlocks(Frame,asyncore.dispatcher):
-    def __init__(self,master=None):
-        Frame.__init__(self,master)
-        self.master.title("Receiver")
-        self.grid()
+
+
+
+class Receiver(Thread):
+    def __init__(self):
+        Thread.__init__(self)
         self.files = {}
         self.init_comms()
 
     def init_comms(self):
-        asyncore.dispatcher.__init__(self)
-        self.create_socket(socket.AF_INET,socket.SOCK_DGRAM)
-        self.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True)
-        self.bind(('',44000))
-        self.socket_poll()
+        self.sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,True)
+        self.sock.bind(('',44000))
 
-    def socket_poll(self):
-        asyncore.poll(timeout=0.0)
-        self.after(1, self.socket_poll) 
+    def run(self):
+        while(1):
+            data = eval(self.sock.recv(65536))
+            print data
+            read_packet(self.files,data)            
+            construct(self.files)
 
-    def handle_read(self):
-        print 'here'
-        data = eval(self.recv(65536))
-        read_packet(self.files,data)            
-        construct(self.files)
-        self.display(self.files)
+class GuiReceiver(Frame):
+    def __init__(self,master=None):
+        Frame.__init__(self,master)
+        receiver = Receiver()
+        receiver.start()
+        self.master.title(".")	  
+        self.grid()
+        self.buttons = []
+        self.handlers = []
+        button_count = 0
+        for row in xrange(SQUARESIZE):
+            for col in xrange(SQUARESIZE):
+                button = Button(self,text='%03d' % (button_count),anchor=W)
+                button.grid(row=row,column=col)
+                tooltip.createToolTip(button, '%d to %d' %(self.get_block_range(button_count)[0],self.get_block_range(button_count)[1]))
+                def handler(event, self=self,button_number=button_count,blockrange=self.get_block_range(button_count)):
+                        return None
+                button.bind("<Button-1>", handler)
+                self.buttons.append(button)
+                self.handlers.append(handler)
+                button_count+=1
+                #if button_count > self.processed_file['total']:
+                    #break
+            #if button_count > self.processed_file['total']:
+                    #break
 
-    def handle_connect(self):
-        pass
+    def get_block_range(self,input_value):
+        block_count = self.processed_file['total']
+        if block_count < SQUARESIZE**2:
+            block_range_size = 1
+        else:
+            block_range_size = block_count/(SQUARESIZE**2)
+            
+        block_range_lower = input_value * block_range_size
+        block_range_upper = block_range_lower + block_range_size - 1
+        return (block_range_lower,block_range_upper)
 
-    def display(self,files):
-        for name,info in files.iteritems():
-            display_width = 100
-            block_count = info['total']
-            display_height = (block_count / display_width) + 1
-            labels = []
-            row_count = 0
-            col_count = 0
-            for i in xrange(block_count):
-                if info['data'][i]:
-                    label = Label(self,text='+',anchor=W)
-                else:
-                    label = Label(self,text='-',anchor=W)
-                label.grid(row=row_count,column=col_count)
-                labels.append(label)
-                if col_count+1 > display_width:
-                    col_count = 0
-                    row_count+=1
-                else:
-                    col_count+=1
-                 
+    def update(self,processed_file):
+        None
             
 
 if __name__ == "__main__":
-    displayBlocks = DisplayBlocks()
-    displayBlocks.mainloop()
+    guiReceiver = GuiReceiver()
+    fileSender.mainloop()
 
