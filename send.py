@@ -4,9 +4,9 @@ import time
 from Tkinter import *
 import tooltip
 
-BLOCKSIZE = 10
-PAUSETIME = 0.2
-SQUARESIZE = 10
+BLOCKSIZE = 50
+PAUSETIME = 0.05
+SQUARESIZE = 3
 
 def next_packet(processed_file):
     for i in xrange(len(processed_file['data'])):
@@ -93,7 +93,7 @@ class FileSender(Frame):
                     break
             if button_count > self.processed_file['total']:
                     break
-        self.send_all()
+        #self.send_all()
 
     def send_all(self):
         for handler in self.handlers:
@@ -113,7 +113,9 @@ class FileSender(Frame):
             block_range_size = block_count/(SQUARESIZE**2)
             
         block_range_lower = input_value * block_range_size
-        block_range_upper = block_range_lower + block_range_size - 1
+        block_range_upper = block_range_lower + block_range_size
+        if block_range_upper + (block_range_size*2) >= block_count:
+            block_range_upper = block_count
         return (block_range_lower,block_range_upper)
 
 
