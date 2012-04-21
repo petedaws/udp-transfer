@@ -9,21 +9,23 @@ SQUARESIZE = 3
 
 def read_packet(guis,files,input_packet):
     if input_packet['name'] not in files:
-        file_data = [None for x in range(input_packet['total'])]
+        file_data = [None for x in range(input_packet['total_blocks'])]
         file_data[input_packet['block']] = input_packet['data']
         file_info = {\
-            'total':input_packet['total'],
+            'total_blocks':input_packet['total_blocks'],
             'data':file_data,
             'block_size':input_packet['block_size'],
+            'name':input_packet['name']
             }
             
         files[input_packet['name']] = file_info
-        guis[input_packet['name']] = GuiReceiver(file_details=input_packet)
+        guis[input_packet['name']] = GuiReceiver(file_detail=files[input_packet['name']])
         display = Display(guis[input_packet['name']])
         display.start()
     else:
         files[input_packet['name']]['data'][input_packet['block']] = input_packet['data']
         guis[input_packet['name']].update(input_packet)
+    print "Got Block %d of %s"%(input_packet['block'],input_packet['name'])
 
 def construct(input_files):
     complete_list = []
@@ -56,7 +58,6 @@ class Receiver(Thread):
     def run(self):
         while(1):
             data = eval(self.sock.recv(65536))
-            print data
             read_packet(self.guis,self.files,data)            
             construct(self.files)
 
@@ -70,11 +71,10 @@ class Display(Thread):
 
 
 class GuiReceiver(Frame):
-    def __init__(self,master=None,file_details=None):
+    def __init__(self,master=None,file_detail=None):
         Frame.__init__(self,master)
-        self._file_details = file_details
-        self.master.title(self._file_details['name'])
-        self.received = [None for x in range(self._file_details['total'])]
+        self._file_detail = file_detail
+        self.master.title(self._file_detail['name'])
         self.grid()
         self.buttons = []
         button_count = 0
@@ -85,13 +85,13 @@ class GuiReceiver(Frame):
                 tooltip.createToolTip(button, '%d to %d' %(self.get_block_range(button_count)[0],self.get_block_range(button_count)[1]))
                 self.buttons.append(button)
                 button_count+=1
-                if button_count > self._file_details['total']:
+                if button_count > self._file_detail['total_blocks']:
                     break
-            if button_count > self._file_details['total']:
+            if button_count > self._file_detail['total_blocks']:
                     break
 
     def get_block_range(self,input_value):
-        block_count = self._file_details['total']
+        block_count = self._file_detail['total_blocks']
         if block_count < SQUARESIZE**2:
             block_range_size = 1
         else:
@@ -103,12 +103,11 @@ class GuiReceiver(Frame):
 
     def check_range_received(self,start,end):
         for i in xrange(start,end):
-            if not self.received[i]:
+            if not self._file_detail['data'][i]:
                 return False
         return True
 
     def update(self,input_packet):
-        self.received[input_packet['block']] = True
         for i in xrange(len(self.buttons)):
             start,end = self.get_block_range(i)
             if self.check_range_received(start,end):

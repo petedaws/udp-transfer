@@ -12,7 +12,7 @@ def next_packet(processed_file):
     for i in xrange(len(processed_file['data'])):
         yield {\
                 'block':i,
-                'total':processed_file['total'],
+                'total_blocks':processed_file['total_blocks'],
                 'name':processed_file['name'],
                 'data':processed_file['data'][i],
                 'block_size':processed_file['block_size'],
@@ -33,7 +33,7 @@ def read_file(input_filename,block_size):
     processed_file = {\
                     'name':input_filename,
                     'block_size':block_size,
-                    'total':block_count,
+                    'total_blocks':block_count,
                     'data':file_data,
                     'send_status':send_status
                     }
@@ -42,7 +42,7 @@ def read_file(input_filename,block_size):
 def send(processed_file):
     sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
     for packet in next_packet(processed_file):
-        print 'Sending block %i of %i' % (packet['block'],packet['total'])
+        print 'Sending block %i of %i' % (packet['block'],packet['total_blocks'])
         sock.sendto(repr(packet),('localhost',44000))
         processed_file['send_status'][packet['block']] = True
         time.sleep(PAUSETIME)
@@ -52,12 +52,12 @@ def send_block_range(processed_file,start,end):
     for i in xrange(start,end):
         packet = {\
                 'block':i,
-                'total':processed_file['total'],
+                'total_blocks':processed_file['total_blocks'],
                 'name':processed_file['name'],
                 'data':processed_file['data'][i],
                 'block_size':processed_file['block_size'],
                 }
-        print 'Sending block %i of %i' % (packet['block'],packet['total'])
+        print 'Sending block %i of %i' % (packet['block'],packet['total_blocks'])
         sock.sendto(repr(packet),('localhost',44000))
         processed_file['send_status'][i] = True
         time.sleep(PAUSETIME)
@@ -89,9 +89,9 @@ class FileSender(Frame):
                 self.buttons.append(button)
                 self.handlers.append(handler)
                 button_count+=1
-                if button_count > self.processed_file['total']:
+                if button_count > self.processed_file['total_blocks']:
                     break
-            if button_count > self.processed_file['total']:
+            if button_count > self.processed_file['total_blocks']:
                     break
         #self.send_all()
 
@@ -106,7 +106,7 @@ class FileSender(Frame):
         
 
     def get_block_range(self,input_value):
-        block_count = self.processed_file['total']
+        block_count = self.processed_file['total_blocks']
         if block_count < SQUARESIZE**2:
             block_range_size = 1
         else:
