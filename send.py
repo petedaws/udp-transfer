@@ -2,9 +2,11 @@ import sys
 import socket
 import time
 from Tkinter import *
+from threading import Thread
 import tooltip
 
-BLOCKSIZE = 50
+PORT = 44000
+BLOCKSIZE = 100
 PAUSETIME = 0.05
 SQUARESIZE = 3
 
@@ -39,28 +41,40 @@ def read_file(input_filename,block_size):
                     }
     return processed_file
 
-def send(processed_file):
-    sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    for packet in next_packet(processed_file):
-        print 'Sending block %i of %i' % (packet['block'],packet['total_blocks'])
-        sock.sendto(repr(packet),('localhost',44000))
-        processed_file['send_status'][packet['block']] = True
-        time.sleep(PAUSETIME)
+class Observable(object):
+    def __init__(self,observer,callback):
+        self._observers = {}
+        self._observers[observer] = callback
+ 
+    def emit(self,args):
+        for observer,callback in self._observers.iteritems():
+            call = getattr(observer, callback)
+            call(*args)
 
-def send_block_range(processed_file,start,end):
-    sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    for i in xrange(start,end):
-        packet = {\
-                'block':i,
-                'total_blocks':processed_file['total_blocks'],
-                'name':processed_file['name'],
-                'data':processed_file['data'][i],
-                'block_size':processed_file['block_size'],
-                }
-        print 'Sending block %i of %i' % (packet['block'],packet['total_blocks'])
-        sock.sendto(repr(packet),('localhost',44000))
-        processed_file['send_status'][i] = True
-        time.sleep(PAUSETIME)
+class Sender(Thread,Observable):
+    def __init__(self,processed_file,sender_id,start,end,observer,callback):
+        Observable.__init__(self,observer,callback)
+        self._processed_file = processed_file
+        self._start = start
+        self._end = end
+        self._sender_id = sender_id
+        Thread.__init__(self)
+
+    def run(self):
+        sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        for i in xrange(self._start,self._end):
+            packet = {\
+                    'block':i,
+                    'total_blocks':self._processed_file['total_blocks'],
+                    'name':self._processed_file['name'],
+                    'data':self._processed_file['data'][i],
+                    'block_size':self._processed_file['block_size'],
+                    }
+            print 'Sending block %i of %i' % (packet['block'],packet['total_blocks'])
+            sock.sendto(repr(packet),('localhost',44000))
+            self._processed_file['send_status'][i] = True
+            time.sleep(PAUSETIME)
+        self.emit((self._sender_id,self._start,self._end))
 
 def check_range_sent(processed_file,start,end):
     for i in xrange(start,end):
@@ -80,7 +94,7 @@ class FileSender(Frame):
         button_count = 0
         for row in xrange(SQUARESIZE):
             for col in xrange(SQUARESIZE):
-                button = Button(self,text='%03d' % (button_count),anchor=W)
+                button = Button(self,text='%04d' % (button_count),anchor=W)
                 button.grid(row=row,column=col)
                 tooltip.createToolTip(button, '%d to %d' %(self.get_block_range(button_count)[0],self.get_block_range(button_count)[1]))
                 def handler(event, self=self,button_number=button_count,blockrange=self.get_block_range(button_count)):
@@ -100,10 +114,11 @@ class FileSender(Frame):
             handler(None)
 
     def send_blocks(self,button_number,start,end):
-        send_block_range(self.processed_file,start,end)
+        Sender(self.processed_file,button_number,start,end,self,"update_button").start()
+ 
+    def update_button(self,button_number,start,end):
         if check_range_sent(self.processed_file,start,end):
             self.buttons[button_number].configure(bg = "green")
-        
 
     def get_block_range(self,input_value):
         block_count = self.processed_file['total_blocks']

@@ -5,6 +5,7 @@ from Tkinter import *
 from threading import Thread
 import tooltip
 
+PORT = 44000
 SQUARESIZE = 3
 
 def read_packet(guis,files,input_packet):
@@ -35,7 +36,10 @@ def construct(input_files):
         output = ''
         for fragment in info['data']:
             output+=fragment
-        open('new'+name,'wb').write(output)
+        new_file = open('new'+name,'wb')
+        new_file.write(output)
+        new_file.close()
+        
         print 'Creating: %s' % ('new'+name)
         complete_list.append(name)
     for filename in complete_list:
@@ -80,7 +84,7 @@ class GuiReceiver(Frame):
         button_count = 0
         for row in xrange(SQUARESIZE):
             for col in xrange(SQUARESIZE):
-                button = Button(self,text='%03d' % (button_count),anchor=W)
+                button = Button(self,text='%04d' % (button_count),anchor=W)
                 button.grid(row=row,column=col)
                 tooltip.createToolTip(button, '%d to %d' %(self.get_block_range(button_count)[0],self.get_block_range(button_count)[1]))
                 self.buttons.append(button)
